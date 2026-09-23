@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Bubble Breath — Calm Pop Journey</title>
+<style>
+  :root{
+    --bg1:#dff3ff; --bg2:#eafff4; --accent:#5aa9c9; --card:#ffffffcc; --text:#2b3a45;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0; font-family:'Segoe UI', Tahoma, sans-serif;
+    height:100vh; overflow:hidden;
+    background:linear-gradient(160deg,var(--bg1),var(--bg2));
+    transition:background 1.2s ease;
+    color:var(--text);
+  }
+  #game{position:relative; width:100%; height:100vh; overflow:hidden;}
+  .bubble{
+    position:absolute; bottom:-80px; border-radius:50%;
+    box-shadow:0 0 15px rgba(255,255,255,.6) inset, 0 0 10px rgba(0,0,0,.05);
+    cursor:pointer; opacity:.9;
+    animation:rise linear forwards;
+  }
+  @keyframes rise{
+    to{ transform:translateY(-110vh); }
+  }
+  .pop{
+    animation:popAnim .35s ease forwards !important;
+  }
+  @keyframes popAnim{
+    0%{transform:scale(1); opacity:1;}
+    100%{transform:scale(1.8); opacity:0;}
+  }
+  #ui{
+    position:absolute; top:0; left:0; width:100%; padding:16px 24px;
+    display:flex; justify-content:space-between; align-items:center;
+    z-index:10; pointer-events:none;
+  }
+  #ui > div{pointer-events:auto;}
+  .pill{
+    background:var(--card); padding:8px 16px; border-radius:20px;
+    font-size:14px; font-weight:600; box-shadow:0 2px 8px rgba(0,0,0,.08);
+    backdrop-filter:blur(4px);
+  }
+  #menu, #breathScreen, #levelSelect{
+    position:absolute; inset:0; display:flex; flex-direction:column;
+    align-items:center; justify-content:center; text-align:center;
+    background:linear-gradient(160deg,var(--bg1),var(--bg2));
+    z-index:50; padding:20px;
+  }
+  h1{font-size:2.2em; margin-bottom:4px; color:var(--accent);}
+  p.sub{opacity:.75; margin-top:0; margin-bottom:30px;}
+  button{
+    background:var(--accent); color:white; border:none; padding:14px 30px;
+    border-radius:30px; font-size:1em; cursor:pointer; margin:8px;
+    box-shadow:0 4px 14px rgba(90,169,201,.4); transition:transform .2s;
+  }
+  button:hover{transform:translateY(-2px);}
+  button.secondary{background:#a9c9b8;}
+  #levelGrid{
+    display:grid; grid-template-columns:repeat(5,1fr); gap:12px; max-width:500px; margin:20px 0;
+  }
+  .levelBtn{
+    width:70px; height:70px; border-radius:16px; background:var(--card);
+    color:var(--text); font-weight:700; font-size:1.1em; box-shadow:0 3px 10px rgba(0,0,0,.08);
+    display:flex; align-items:center; justify-content:center; cursor:pointer; border:2px solid transparent;
+  }
+  .levelBtn.locked{opacity:.35; cursor:not-allowed;}
+  .levelBtn.done{border-color:var(--accent);}
+  #breathCircle{
+    width:120px; height:120px; border-radius:50%; background:radial-gradient(circle,#bfe6ff,#8fcae0);
+    margin:30px auto; animation:breathe 12s ease-in-out;
+  }
+  @keyframes breathe{
+    0%{transform:scale(1);}
+    33%{transform:scale(1.6);}
+    66%{transform:scale(1.6);}
+    100%{transform:scale(1);}
+  }
+  #quoteText{font-style:italic; max-width:420px; margin:10px auto 30px; opacity:.85;}
+  #progressBar{
+    width:220px; height:10px; background:#ffffff88; border-radius:10px; overflow:hidden; margin-top:4px;
+  }
+  #progressFill{height:100%; background:var(--accent); width:0%; transition:width .3s;}
+  .hidden{display:none !important;}
+</style>
+</head>
+<body>
+
+<div id="menu">
+  <h1>🫧 Bubble Breath</h1>
+  <p class="sub">A calm pop journey — no timers, no pressure, just peace.</p>
+  <button onclick="startFromMenu()">Start</button>
+  <button class="secondary" onclick="showLevelSelect()">Levels</button>
+</div>
+
+<div id="levelSelect" class="hidden">
+  <h1>Choose a Level</h1>
+  <div id="levelGrid"></div>
+  <button class="secondary" onclick="backToMenu()">Back</button>
+</div>
+
+<div id="breathScreen" class="hidden">
+  <h1 id="levelDoneTitle">Level Complete 🌸</h1>
+  <div id="breathCircle"></div>
+  <p>Breathe in... hold... breathe out...</p>
+  <p id="quoteText"></p>
+  <button onclick="nextLevel()">Continue</button>
+</div>
+
+<div id="game" class="hidden">
+  <div id="ui">
+    <div class="pill">Level <span id="levelNum">1</span>: <span id="levelName"></span></div>
+    <div class="pill">Calm Points: <span id="calmPoints">0</span></div>
+  </div>
+  <div id="progressBarWrap" style="position:absolute; top:60px; left:50%; transform:translateX(-50%); z-index:10;">
+    <div id="progressBar"><div id="progressFill"></div></div>
+  </div>
+</div>
+
+<script>
+const levels = [
+  {name:"Ocean Waves", colors:["#89CFF0","#5DADE2","#AED6F1"], bg:["#dff3ff","#eafff4"], target:15},
+  {name:"Garden Morning", colors:["#A9DFBF","#F5B7B1","#ABEBC6"], bg:["#e8ffe8","#fff0f5"], target:15},
+  {name:"Rainy Window", colors:["#B0C4DE","#8FA8C4","#C9D6E3"], bg:["#e4e9f0","#dfe7ee"], target:16},
+  {name:"Sunset Sky", colors:["#F5B041","#EB984E","#F0B27A"], bg:["#ffe8d6","#ffd9c2"], target:16},
+  {name:"Night Stars", colors:["#5D6D7E","#85929E","#AAB7B8"], bg:["#1b2735","#2c3e50"], target:17},
+  {name:"Snow Fall", colors:["#FDFEFE","#EAECEE","#D6EAF8"], bg:["#f0f8ff","#e6f7ff"], target:17},
+  {name:"Forest Whisper", colors:["#82C99A","#58A860","#A9DFBF"], bg:["#e3ffe9","#d7f5df"], target:18},
+  {name:"Candle Light", colors:["#F7DC6F","#F5CBA7","#F8C471"], bg:["#fff5d9","#ffe9c7"], target:18},
+  {name:"Aurora Dream", colors:["#C39BD3","#7FB3D5","#82E0AA"], bg:["#e9d9ff","#d9f0ff"], target:19},
+  {name:"Full Calm", colors:["#AED6F1","#F5B7B1","#A9DFBF","#F7DC6F"], bg:["#f0f0ff","#fff0f0"], target:20}
+];
+
+const quotes = [
+  "Peace comes from within.",
+  "Breathe. You are exactly where you need to be.",
+  "Slow down, everything you're chasing will wait.",
+  "Calm mind brings inner strength.",
+  "Let go of what you cannot control.",
+  "This moment is enough.",
+  "Stillness is where clarity lives.",
+  "You are safe. You are calm.",
+  "Every breath is a fresh start.",
+  "You did wonderfully. Rest now."
+];
+
+let currentLevel = 0;
+let popped = 0;
+let calmPoints = 0;
+let unlocked = [0];
+let spawnInterval;
+
+const gameEl = document.getElementById('game');
+const menuEl = document.getElementById('menu');
+const levelSelectEl = document.getElementById('levelSelect');
+const breathScreenEl = document.getElementById('breathScreen');
+
+function startFromMenu(){
+  currentLevel = 0;
+  loadLevel(0);
+}
+
+function showLevelSelect(){
+  menuEl.classList.add('hidden');
+  levelSelectEl.classList.remove('hidden');
+  const grid = document.getElementById('levelGrid');
+  grid.innerHTML = '';
+  levels.forEach((lvl,i)=>{
+    const btn = document.createElement('div');
+    btn.className = 'levelBtn' + (unlocked.includes(i) ? '' : ' locked') + (i < currentLevel ? ' done' : '');
+    btn.textContent = i+1;
+    if(unlocked.includes(i)){
+      btn.onclick = ()=>{ currentLevel = i; loadLevel(i); };
+    }
+    grid.appendChild(btn);
+  });
+}
+
+function backToMenu(){
+  levelSelectEl.classList.add('hidden');
+  menuEl.classList.remove('hidden');
+}
+
+function loadLevel(i){
+  levelSelectEl.classList.add('hidden');
+  menuEl.classList.add('hidden');
+  breathScreenEl.classList.add('hidden');
+  gameEl.classList.remove('hidden');
+  popped = 0;
+  const lvl = levels[i];
+  document.getElementById('levelNum').textContent = i+1;
+  document.getElementById('levelName').textContent = lvl.name;
+  document.getElementById('progressFill').style.width = '0%';
+  document.body.style.background = `linear-gradient(160deg, ${lvl.bg[0]}, ${lvl.bg[1]})`;
+  spawnBubbles(lvl);
+}
+
+function spawnBubbles(lvl){
+  clearInterval(spawnInterval);
+  spawnInterval = setInterval(()=>{
+    if(popped >= lvl.target){ clearInterval(spawnInterval); return; }
+    createBubble(lvl);
+  }, 700);
+}
+
+function createBubble(lvl){
+  const b = document.createElement('div');
+  b.className = 'bubble';
+  const size = 40 + Math.random()*50;
+  b.style.width = size+'px';
+  b.style.height = size+'px';
+  b.style.left = Math.random()*90 + '%';
+  const color = lvl.colors[Math.floor(Math.random()*lvl.colors.length)];
+  b.style.background = `radial-gradient(circle at 30% 30%, #ffffffaa, ${color})`;
+  const duration = 6 + Math.random()*4;
+  b.style.animationDuration = duration+'s';
+  b.onclick = ()=> popBubble(b);
+  gameEl.appendChild(b);
+  setTimeout(()=>{ if(b.parentNode) b.remove(); }, duration*1000+200);
+}
+
+function popBubble(b){
+  if(b.classList.contains('pop')) return;
+  b.classList.add('pop');
+  popped++;
+  calmPoints += 10;
+  document.getElementById('calmPoints').textContent = calmPoints;
+  const lvl = levels[currentLevel];
+  const pct = Math.min(100, (popped/lvl.target)*100);
+  document.getElementById('progressFill').style.width = pct+'%';
+  setTimeout(()=> b.remove(), 350);
+  if(popped >= lvl.target){
+    setTimeout(finishLevel, 500);
+  }
+}
+
+function finishLevel(){
+  clearInterval(spawnInterval);
+  document.querySelectorAll('.bubble').forEach(b=>b.remove());
+  gameEl.classList.add('hidden');
+  breathScreenEl.classList.remove('hidden');
+  document.getElementById('quoteText').textContent = quotes[currentLevel];
+  const circle = document.getElementById('breathCircle');
+  circle.style.animation = 'none';
+  void circle.offsetWidth;
+  circle.style.animation = 'breathe 12s ease-in-out';
+  if(currentLevel+1 < levels.length && !unlocked.includes(currentLevel+1)){
+    unlocked.push(currentLevel+1);
+  }
+  if(currentLevel === levels.length-1){
+    document.getElementById('levelDoneTitle').textContent = "All Levels Complete 🌸 You are fully calm.";
+  } else {
+    document.getElementById('levelDoneTitle').textContent = "Level Complete 🌸";
+  }
+}
+
+function nextLevel(){
+  if(currentLevel+1 < levels.length){
+    currentLevel++;
+    loadLevel(currentLevel);
+  } else {
+    breathScreenEl.classList.add('hidden');
+    menuEl.classList.remove('hidden');
+  }
+}
+</script>
+</body>
+</html>
